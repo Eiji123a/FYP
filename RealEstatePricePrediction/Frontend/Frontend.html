@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Real Estate Price Prediction</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <h1>Real Estate Price Prediction</h1>
+
+  <form onsubmit="return false;">
+    <label>Region:
+      <input type="text" id="region" value="Tokyo">
+    </label>
+    <br><br>
+    <label>Months Ahead:
+      <input type="number" id="months" value="6" min="1" max="24">
+    </label>
+    <br><br>
+    <button onclick="predict()">Predict</button>
+  </form>
+
+  <h2>Prediction Results</h2>
+  <div id="result"></div>
+  <canvas id="predictionChart" width="600" height="400"></canvas>
+
+  <script>
+    let chart = null;
+
+    async function predict() {
+      const region = document.getElementById("region").value;
+      const months = parseInt(document.getElementById("months").value);
+
+      const response = await fetch("http://127.0.0.1:8000/predict", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({region: region, months_ahead: months})
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        document.getElementById("result").innerText =
+          "Error: " + error.detail;
+        return;
+      }
+
+      const data = await response.json();
+      const predictions = data.predictions;
+
+      // Display results as text
+      document.getElementById("result").innerText =
+        `Region: ${data.region}\n${data.months_ahead} months ahead: ${predictions.map(p => "$" + p.toFixed(0)).join(", ")}`;
+
+      // Build labels for X-axis
+      const labels = [];
+      for (let i = 1; i <= data.months_ahead; i++) {
+        labels.push(i + " month(s) ahead");
+      }
+
+      // Destroy old chart if exists
+      if (chart) {
+        chart.destroy();
+      }
+
+      // Draw with Chart.js
+      const ctx = document.getElementById("predictionChart").getContext("2d");
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: data.region + " Predicted Price",
+            data: predictions,
+            borderColor: "blue",
+            backgroundColor: "lightblue",
+            fill: false,
+            tension: 0.2
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { position: 'top' },
+            title: { display: true, text: data.region + " Price Forecast" }
+          },
+          scales: {
+            y: {
+              title: { display: true, text: "Price (JPY)" }
+            },
+            x: {
+              title: { display: true, text: "Forecast Horizon" }
+            }
+          }
+        }
+      });
+    }
+  </script>
+</body>
+</html>
